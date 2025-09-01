@@ -615,7 +615,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function ensureAll(){ const existing=[]; entries.forEach(e=>{ ensureInside(e, existing); existing.push(e.pos); }); save(entries); }
   function initial(){ ensureAll(); renderList(); renderFrame(); }
   window.addEventListener('resize', ()=>{ buildSprites(); renderFrame(); });
-  if(maskCanvas) initial(); else { const i=setInterval(()=>{ if(maskCanvas){ clearInterval(i); initial(); } },60); }
+  // Initialize once mask is ready; avoid duplicate interval-based init
+  if(maskCanvas) initial();
 });
 </script>
 </body></html>
