@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Coordinate System Performance Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .test-section { margin: 20px 0; border: 1px solid #ccc; padding: 15px; }
+        .result { margin: 5px 0; color: #333; }
+        .warning { color: #ff6600; font-weight: bold; }
+        .error { color: #ff0000; font-weight: bold; }
+        .success { color: #008000; font-weight: bold; }
+        canvas { border: 1px solid #000; }
+        .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .metric-box { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Canvas Rendering Performance Analysis</h1>
+    
+    <div class="test-section">
+        <h2>1. Canvas Setup & Device Pixel Ratio Test</h2>
+        <div id="canvas-test-results"></div>
+        <canvas id="testCanvas" width="600" height="400"></canvas>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Coordinate Transformation Accuracy Test</h2>
+        <div id="coord-test-results"></div>
+        <div class="metrics">
+            <div class="metric-box">
+                <h3>Expected Coordinates</h3>
+                <div id="expected-coords"></div>
+            </div>
+            <div class="metric-box">
+                <h3>Actual Coordinates</h3>
+                <div id="actual-coords"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Mask Application Performance Test</h2>
+        <div id="mask-test-results"></div>
+        <div id="mask-metrics"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Rendering Performance Benchmark</h2>
+        <div id="perf-test-results"></div>
+        <div id="perf-metrics"></div>
+    </div>
+
+    <script>
+        // Test Configuration
+        const CONFIG = {
+            TEST_COINS: 50,
+            BENCHMARK_FRAMES: 1000,
+            TOLERANCE: 0.5 // pixel tolerance for coordinate accuracy
+        };
+
+        // Utility functions
+        function log(containerId, message, type = 'result') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = message;
+            container.appendChild(div);
+        }
+
+        function measureTime(fn, iterations = 1) {
+            const start = performance.now();
+            for (let i = 0; i < iterations; i++) {
+                fn();
+            }
+            const end = performance.now();
+            return (end - start) / iterations;
+        }
+
+        // Canvas setup functions (simplified from original)
+        let canvas, ctx, dpr;
+        
+        function initCanvas() {
+            canvas = document.getElementById('testCanvas');
+            ctx = canvas.getContext('2d');
+            return canvas && ctx;
+        }
+
+        function fitCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            dpr = Math.max(1, window.devicePixelRatio || 1);
+            const w = Math.max(1, Math.floor(rect.width * dpr));
+            const h = Math.max(1, Math.floor(rect.height * dpr));
+            
+            if (canvas.width !== w || canvas.height !== h) {
+                canvas.width = w;
+                canvas.height = h;
+            }
+            
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return { width: w, height: h, dpr };
+        }
+
+        // Test 1: Canvas Setup & Device Pixel Ratio
+        function testCanvasSetup() {
+            log('canvas-test-results', 'Testing canvas initialization...');
+            
+            if (!initCanvas()) {
+                log('canvas-test-results', 'ERROR: Canvas initialization failed', 'error');
+                return false;
+            }
+            
+            const originalDpr = window.devicePixelRatio;
+            log('canvas-test-results', `Device Pixel Ratio: ${originalDpr}`);
+            
+            const { width, height, dpr: actualDpr } = fitCanvas();
+            log('canvas-test-results', `Canvas dimensions: ${width}x${height}`);
+            log('canvas-test-results', `Effective DPR: ${actualDpr}`);
+            
+            // Test coordinate system scaling
+            const clientWidth = canvas.clientWidth;
+            const clientHeight = canvas.clientHeight;
+            
+            log('canvas-test-results', `Client dimensions: ${clientWidth}x${clientHeight}`);
+            log('canvas-test-results', `Canvas buffer dimensions: ${canvas.width}x${canvas.height}`);
+            
+            const scaleX = canvas.width / clientWidth;
+            const scaleY = canvas.height / clientHeight;
+            
+            if (Math.abs(scaleX - actualDpr) > 0.01 || Math.abs(scaleY - actualDpr) > 0.01) {
+                log('canvas-test-results', `WARNING: Scale mismatch - X: ${scaleX}, Y: ${scaleY}, DPR: ${actualDpr}`, 'warning');
+            } else {
+                log('canvas-test-results', 'Canvas scaling is correct', 'success');
+            }
+            
+            return true;
+        }
+
+        // Test 2: Coordinate Transformation Accuracy
+        function testCoordinateAccuracy() {
+            log('coord-test-results', 'Testing coordinate transformations...');
+            
+            const coinSize = 69;
+            const testPositions = [
+                { nx: 0.1, ny: 0.2, desc: 'Top-left' },
+                { nx: 0.5, ny: 0.5, desc: 'Center' },
+                { nx: 0.9, ny: 0.8, desc: 'Bottom-right' },
+                { nx: 0.25, ny: 0.75, desc: 'Bottom-left quarter' },
+                { nx: 0.75, ny: 0.25, desc: 'Top-right quarter' }
+            ];
+            
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
+            
+            let maxError = 0;
+            let errorCount = 0;
+            
+            testPositions.forEach(pos => {
+                // Original coordinate calculation (from the app)
+                const expectedX = Math.round(pos.nx * (w - coinSize));
+                const expectedY = Math.round(pos.ny * (h - coinSize));
+                
+                // Test alternative calculation methods
+                const altX1 = pos.nx * (w - coinSize);
+                const altY1 = pos.ny * (h - coinSize);
+                
+                const altX2 = (pos.nx * w) - (coinSize / 2);
+                const altY2 = (pos.ny * h) - (coinSize / 2);
+                
+                // Calculate errors
+                const errorX1 = Math.abs(expectedX - altX1);
+                const errorY1 = Math.abs(expectedY - altY1);
+                const errorX2 = Math.abs(expectedX - altX2);
+                const errorY2 = Math.abs(expectedY - altY2);
+                
+                maxError = Math.max(maxError, errorX1, errorY1, errorX2, errorY2);
+                
+                if (errorX1 > CONFIG.TOLERANCE || errorY1 > CONFIG.TOLERANCE) {
+                    errorCount++;
+                    log('coord-test-results', 
+                        `WARNING: ${pos.desc} coordinate error > tolerance: X=${errorX1.toFixed(2)}, Y=${errorY1.toFixed(2)}`, 
+                        'warning');
+                }
+                
+                // Log expected vs actual
+                document.getElementById('expected-coords').innerHTML += 
+                    `${pos.desc}: (${expectedX}, ${expectedY})<br>`;
+                document.getElementById('actual-coords').innerHTML += 
+                    `${pos.desc}: (${altX1.toFixed(1)}, ${altY1.toFixed(1)})<br>`;
+            });
+            
+            log('coord-test-results', `Maximum coordinate error: ${maxError.toFixed(2)}px`);
+            
+            if (errorCount === 0) {
+                log('coord-test-results', 'All coordinate transformations within tolerance', 'success');
+            } else {
+                log('coord-test-results', `${errorCount} coordinate transformations exceed tolerance`, 'warning');
+            }
+        }
+
+        // Test 3: Mask Application Performance
+        function testMaskPerformance() {
+            log('mask-test-results', 'Testing mask application performance...');
+            
+            // Create a test mask
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = 100;
+            maskCanvas.height = 100;
+            const maskCtx = maskCanvas.getContext('2d');
+            
+            // Draw a circular mask
+            maskCtx.fillStyle = 'white';
+            maskCtx.beginPath();
+            maskCtx.arc(50, 50, 40, 0, Math.PI * 2);
+            maskCtx.fill();
+            
+            // Test mask application function
+            function applyTestMask() {
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-in';
+                ctx.drawImage(maskCanvas, 0, 0, maskCanvas.width, maskCanvas.height, 
+                             0, 0, canvas.clientWidth, canvas.clientHeight);
+                ctx.restore();
+            }
+            
+            // Draw test content
+            function drawTestContent() {
+                ctx.fillStyle = 'red';
+                ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+            }
+            
+            // Benchmark mask application
+            const maskTime = measureTime(() => {
+                drawTestContent();
+                applyTestMask();
+            }, 100);
+            
+            log('mask-test-results', `Average mask application time: ${maskTime.toFixed(3)}ms`);
+            
+            if (maskTime > 5) {
+                log('mask-test-results', 'WARNING: Mask application is slow (>5ms)', 'warning');
+            } else {
+                log('mask-test-results', 'Mask application performance is good', 'success');
+            }
+            
+            // Test mask accuracy with sample points
+            const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
+            
+            function maskAlphaAt(nx, ny) {
+                const x = Math.max(0, Math.min(maskCanvas.width - 1, Math.round(nx * maskCanvas.width)));
+                const y = Math.max(0, Math.min(maskCanvas.height - 1, Math.round(ny * maskCanvas.height)));
+                return maskData[(y * maskCanvas.width + x) * 4 + 3];
+            }
+            
+            // Test mask boundary detection
+            const testPoints = [
+                { nx: 0.5, ny: 0.5, expected: 255, desc: 'Center (inside)' },
+                { nx: 0.1, ny: 0.1, expected: 0, desc: 'Corner (outside)' },
+                { nx: 0.9, ny: 0.5, expected: 0, desc: 'Edge (outside)' }
+            ];
+            
+            testPoints.forEach(point => {
+                const alpha = maskAlphaAt(point.nx, point.ny);
+                const correct = Math.abs(alpha - point.expected) < 50;
+                
+                if (correct) {
+                    log('mask-test-results', `${point.desc}: alpha=${alpha} ✓`, 'success');
+                } else {
+                    log('mask-test-results', `${point.desc}: alpha=${alpha} (expected ~${point.expected})`, 'warning');
+                }
+            });
+        }
+
+        // Test 4: Overall Rendering Performance
+        function testRenderingPerformance() {
+            log('perf-test-results', 'Running rendering performance benchmark...');
+            
+            const coinSize = 69;
+            
+            // Generate test coin positions
+            const testCoins = [];
+            for (let i = 0; i < CONFIG.TEST_COINS; i++) {
+                testCoins.push({
+                    x: 0.1 + (Math.random() * 0.8),
+                    y: 0.2 + (Math.random() * 0.6)
+                });
+            }
+            
+            function drawTestCoin(x, y) {
+                ctx.fillStyle = '#ffd56b';
+                ctx.beginPath();
+                ctx.arc(x + coinSize/2, y + coinSize/2, coinSize/2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            function renderTestFrame() {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+                
+                // Render all coins
+                const w = canvas.clientWidth;
+                const h = canvas.clientHeight;
+                
+                testCoins.forEach(coin => {
+                    const x = Math.round(coin.x * (w - coinSize));
+                    const y = Math.round(coin.y * (h - coinSize));
+                    drawTestCoin(x, y);
+                });
+            }
+            
+            // Benchmark frame rendering
+            const frameTime = measureTime(renderTestFrame, CONFIG.BENCHMARK_FRAMES);
+            const fps = 1000 / frameTime;
+            
+            log('perf-test-results', `Average frame time: ${frameTime.toFixed(3)}ms`);
+            log('perf-test-results', `Theoretical max FPS: ${fps.toFixed(1)}`);
+            
+            if (frameTime > 16.67) {
+                log('perf-test-results', 'WARNING: Frame time exceeds 60fps budget (16.67ms)', 'warning');
+            } else {
+                log('perf-test-results', 'Frame rendering performance is good for 60fps', 'success');
+            }
+            
+            // Test coordinate calculation performance
+            const coordTime = measureTime(() => {
+                testCoins.forEach(coin => {
+                    const x = Math.round(coin.x * (canvas.clientWidth - coinSize));
+                    const y = Math.round(coin.y * (canvas.clientHeight - coinSize));
+                });
+            }, 10000);
+            
+            log('perf-test-results', `Coordinate calculation time: ${coordTime.toFixed(6)}ms per ${CONFIG.TEST_COINS} coins`);
+            
+            // Memory usage estimation
+            const estimatedMemory = (CONFIG.TEST_COINS * 32 + canvas.width * canvas.height * 4) / 1024;
+            log('perf-test-results', `Estimated memory usage: ${estimatedMemory.toFixed(1)}KB`);
+        }
+
+        // Run all tests
+        function runAllTests() {
+            console.log('Starting canvas performance analysis...');
+            
+            if (testCanvasSetup()) {
+                testCoordinateAccuracy();
+                testMaskPerformance();
+                testRenderingPerformance();
+            }
+            
+            console.log('Performance analysis complete.');
+        }
+
+        // Start tests when page loads
+        window.addEventListener('load', runAllTests);
+    </script>
+</body>
+</html>

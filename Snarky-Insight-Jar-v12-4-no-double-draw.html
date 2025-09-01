@@ -291,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Sprites
   let dpr = Math.max(1, window.devicePixelRatio||1);
-  let coinSize = 47;
+  let coinSize = 42;
   const JAR_SCALE = 1.0; // CSS handles scaling, coordinates should be 1:1
   let coinSprite = null;
   function buildSprites(){
@@ -367,32 +367,32 @@ document.addEventListener("DOMContentLoaded", () => {
   
   function sampleInside(seed, existing){ 
     const rng=mulberry32(hashString(seed)); 
-    const pad=50; // Increased padding for better boundaries
+    const pad=70; // Further increased padding to respect visual jar outline
     const scale = getJarScale();
     const effectiveSize = getEffectiveCanvasSize();
-    const minSep=0.55*coinSize / scale; // Smaller coins need less separation
+    const minSep=0.65*coinSize / scale; // Maintain good visual separation between coins
     
     for(let i=0;i<200;i++){ // Increased attempts
       // Create a more jar-like sampling shape
       const baseY = rng();
       const normalizedY = Math.pow(baseY, 1.6); // Bias towards bottom
       
-      // Map to jar coordinates with tighter bounds
-      const yTop = 0.28;    // Start below jar neck
-      const yBottom = 0.12;  // Leave margin at bottom
+      // Map to jar coordinates with tighter bounds for visual jar shape
+      const yTop = 0.32;    // Start further below jar neck to avoid appearing above jar outline
+      const yBottom = 0.18;  // Increased bottom margin to stay above jar base
       const ny = yTop + normalizedY * (1 - yTop - yBottom);
       
-      // Calculate jar width at this height (jar gets wider towards bottom)
-      const jarWidthFactor = 0.6 + 0.3 * normalizedY; // Narrower at top, wider at bottom
+      // Calculate jar width at this height to match cartoon jar outline
+      const jarWidthFactor = 0.5 + 0.35 * normalizedY; // More conservative width at top, gradual widening
       const centerX = 0.5;
-      const maxHalfWidth = jarWidthFactor * 0.32; // Maximum half-width of jar at this height
+      const maxHalfWidth = jarWidthFactor * 0.28; // Reduced maximum width to stay within visual jar boundaries
       
       // Sample x position within the jar width at this height
       const xRange = rng() * 2 - 1; // -1 to 1
       const nx = centerX + xRange * maxHalfWidth;
       
-      // Ensure we're within jar bounds (0-1 range)
-      if(nx < 0.05 || nx > 0.95) continue;
+      // Ensure we're within visual jar bounds with more conservative margins
+      if(nx < 0.15 || nx > 0.85) continue;
       
       if(!insideMaskPadded(nx,ny,pad)) continue; 
       
@@ -406,7 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } 
     
     console.warn('Could not find valid position, using fallback'); 
-    return {x:0.5,y:0.75}; // Safer fallback position
+    return {x:0.5,y:0.62}; // Centered fallback position in visual jar body
   }
   
   function ensureInside(e, existing){ 
@@ -421,7 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function lerp(a,b,t){ return a + (b-a)*t; }
   let animCoins=[];
   function startDropAnimation(e){
-    const start={x:0.62,y:0.07};
+    const start={x:0.58,y:0.12}; // Adjusted to match jar opening visually
     const dur=650+Math.random()*200;
     animCoins.push({id:e.id,pos:e.pos,cur:{...start},t0:performance.now(),dur,sparkleUntil:0});
     inFlight.add(e.id);          // HIDE static coin while animating
@@ -454,8 +454,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const p=Math.min(1,(now-c.t0)/c.dur);
       const eased=easeOutBounce(p);
       // Animation starts from normalized coordinates that work with our CSS scale
-      const startX = 0.62; // Right side of jar opening
-      const startY = 0.07; // Top of jar
+      const startX = 0.58; // Centered over jar opening
+      const startY = 0.12; // Just above visible jar opening
       c.cur.x=lerp(startX,c.pos.x,eased);
       c.cur.y=lerp(startY,c.pos.y,eased);
       if(p>=1 && !c.sparkleUntil) c.sparkleUntil=now;
