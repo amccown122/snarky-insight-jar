@@ -239,6 +239,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const canvas = $("#jarCanvas"); const ctx = canvas.getContext("2d");
   const listEl=$("#list"), countEl=$("#count");
 
+  // Swap embedded data URIs for external cached assets (non-destructive)
+  // This keeps behavior identical while enabling caching and smaller repaints.
+  // Once validated, we can remove the embedded data URIs from the HTML entirely.
+  try {
+    const jarImg = document.querySelector('.jar-inside');
+    if (jarImg) { jarImg.decoding = 'async'; jarImg.src = 'assets/jar-inside.png'; }
+    const tapeImg = document.querySelector('.tape-art');
+    if (tapeImg) { tapeImg.decoding = 'async'; tapeImg.src = 'assets/tape-art.png'; }
+  } catch {}
+
   function load(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); } catch(e){ return []; } }
   function save(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
   let entries = load();
@@ -259,6 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
     maskCanvas = off; maskData = octx.getImageData(0,0,maskW,maskH).data;
     buildSprites(); initial();
   };
+  // Keep embedded mask as primary source to avoid race conditions with init.
 
   // Audio clink - using real MP3 file
   let coinAudio = null;
@@ -311,6 +322,8 @@ document.addEventListener("DOMContentLoaded", () => {
     c.fillStyle=hi; c.beginPath(); c.arc(r,r,r*0.88,0,Math.PI*2); c.fill();
     coinSprite=off;
   }
+  // Build sprites once early so coins can render even if mask is still loading.
+  try { buildSprites(); } catch {}
 
   // Canvas utils
   function fitCanvas(){ const rect=canvas.getBoundingClientRect(); dpr=Math.max(1,Math.min(3,window.devicePixelRatio||1)); const w=Math.max(1,Math.ceil(rect.width*dpr)); const h=Math.max(1,Math.ceil(rect.height*dpr)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} ctx.setTransform(dpr,0,0,dpr,0,0); }
