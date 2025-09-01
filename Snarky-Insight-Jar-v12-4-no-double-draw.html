@@ -124,32 +124,33 @@ document.addEventListener("DOMContentLoaded", () => {
     buildSprites(); initial();
   };
 
-  // Audio clink (WebAudio)
-  let audioCtx=null;
-  function playClink(){
-    try{
-      audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-      const t = audioCtx.currentTime;
-      function ping(f, when, gainPeak=0.25, dur=0.23){
-        const osc = audioCtx.createOscillator(); const g=audioCtx.createGain();
-        osc.type="sine"; osc.frequency.setValueAtTime(f, when);
-        g.gain.setValueAtTime(0.0001, when);
-        g.gain.exponentialRampToValueAtTime(gainPeak, when+0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, when+dur);
-        osc.connect(g).connect(audioCtx.destination); osc.start(when); osc.stop(when+dur+0.02);
+  // Audio clink - using real MP3 file
+  let coinAudio = null;
+  
+  // Initialize audio on first user interaction
+  function initAudio() {
+    if (!coinAudio) {
+      coinAudio = new Audio('assets/magic_coin.mp3');
+      coinAudio.volume = 0.5; // Set volume to 50%
+      coinAudio.preload = 'auto';
+    }
+  }
+  
+  function playClink() {
+    try {
+      initAudio();
+      if (coinAudio) {
+        // Clone the audio to allow overlapping sounds
+        const audioClone = coinAudio.cloneNode();
+        audioClone.volume = 0.5;
+        audioClone.play().catch(e => {
+          // Fallback for browsers that block autoplay
+          console.log('Audio playback failed:', e);
+        });
       }
-      function noise(when){
-        const len=0.08;
-        const buffer=audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate*len), audioCtx.sampleRate);
-        const data=buffer.getChannelData(0);
-        for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,3);
-        const src=audioCtx.createBufferSource(); src.buffer=buffer;
-        const bp=audioCtx.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=2200; bp.Q.value=6;
-        const g=audioCtx.createGain(); g.gain.value=0.18;
-        src.connect(bp).connect(g).connect(audioCtx.destination); src.start(when);
-      }
-      ping(1800,t); ping(1200,t+0.04,0.22,0.18); noise(t+0.03);
-    }catch(e){}
+    } catch(e) {
+      console.log('Audio error:', e);
+    }
   }
 
   // Sprites
@@ -196,7 +197,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const dur=650+Math.random()*200;
     animCoins.push({id:e.id,pos:e.pos,cur:{...start},t0:performance.now(),dur,sparkleUntil:0});
     inFlight.add(e.id);          // HIDE static coin while animating
-    setTimeout(()=>playClink(), Math.round(dur));
+    // Play sound at 65% of animation (during the drop, before landing)
+    setTimeout(()=>playClink(), Math.round(dur * 0.65));
   }
   function drawSparkle(x,y,t){ const life=280; const p=(performance.now()-t)/life; if(p>1) return false; const a=1-p; const s=6+10*p; ctx.save(); ctx.globalAlpha=a*0.9; ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x-s,y); ctx.lineTo(x+s,y); ctx.moveTo(x,y-s); ctx.lineTo(x,y+s); ctx.stroke(); ctx.restore(); return true; }
 
