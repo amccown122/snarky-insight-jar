@@ -31,7 +31,7 @@
     --radius-xl: 1.5rem; --radius-full: 9999px;
     
     --tape-scale:1.05; --tape-x:0%; --tape-y:-1%;
-    --card-max: 1080px; --card-ar: 4/3; --jar-scale: 140%;
+    --card-max: 1080px; --card-ar: 4/3; --jar-scale: 1.65;
   }
   *, *::before, *::after{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -94,7 +94,7 @@
       radial-gradient(140% 120% at 0% 100%, #f59e0b33 0%, transparent 40%),
       radial-gradient(120% 120% at 100% 0%, #8b5cf633 0%, transparent 50%),
       linear-gradient(135deg,#f6e4b8,#f7b4a8 55%, #bda1f1);border:1px solid var(--border);box-shadow:var(--shadow);}
-  .jar{position:relative;width:var(--jar-scale);margin:auto;aspect-ratio: 1280/800; }
+  .jar{position:relative;width:100%;max-width:600px;margin:auto;aspect-ratio: 1280/800;transform:scale(var(--jar-scale));transform-origin:center;}
   #jarCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:1;}
   .jar-inside,.tape-art,.overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
   .jar-inside{z-index:2} .tape-art{z-index:3;transform:translate(var(--tape-x),var(--tape-y)) scale(var(--tape-scale));transform-origin:center;} .overlay{z-index:4}
@@ -291,10 +291,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Sprites
   let dpr = Math.max(1, window.devicePixelRatio||1);
-  let coinSize = 42;
+  let coinSize = 47;
+  const JAR_SCALE = 1.0; // CSS handles scaling, coordinates should be 1:1
   let coinSprite = null;
   function buildSprites(){
-    dpr = Math.max(1, window.devicePixelRatio||1);
+    dpr = Math.max(1, Math.min(3, window.devicePixelRatio||1));
     const s = Math.round(coinSize*2);
     const off=document.createElement("canvas"); off.width=s; off.height=s;
     const c=off.getContext("2d"); const r=s/2;
@@ -312,17 +313,108 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Canvas utils
-  function fitCanvas(){ const rect=canvas.getBoundingClientRect(); dpr=Math.max(1,window.devicePixelRatio||1); const w=Math.max(1,Math.floor(rect.width*dpr)); const h=Math.max(1,Math.floor(rect.height*dpr)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} ctx.setTransform(dpr,0,0,dpr,0,0); }
+  function fitCanvas(){ const rect=canvas.getBoundingClientRect(); dpr=Math.max(1,Math.min(3,window.devicePixelRatio||1)); const w=Math.max(1,Math.ceil(rect.width*dpr)); const h=Math.max(1,Math.ceil(rect.height*dpr)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} ctx.setTransform(dpr,0,0,dpr,0,0); }
   function clearCanvas(){ ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight); }
   function drawCoinSprite(x,y){ if(!coinSprite) return; const s=coinSize; ctx.save(); ctx.globalAlpha=0.45; ctx.filter="blur(5px)"; ctx.fillStyle="rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(x+s*0.5,y+s*0.5+s*0.30,s*0.42,s*0.22,0,0,Math.PI*2); ctx.fill(); ctx.restore(); ctx.drawImage(coinSprite,x,y,s,s); }
 
+  // Coordinate system helpers
+  function getJarScale(){ return 1.65; } // CSS --jar-scale value
+  function getEffectiveCanvasSize(){ 
+    const scale = getJarScale();
+    return {
+      width: canvas.clientWidth / scale,
+      height: canvas.clientHeight / scale
+    };
+  }
+  function normalizedToCanvas(nx, ny){
+    const effectiveSize = getEffectiveCanvasSize();
+    const scale = getJarScale();
+    // Account for the CSS scaling when converting normalized coordinates to canvas pixels
+    const canvasX = nx * effectiveSize.width * scale;
+    const canvasY = ny * effectiveSize.height * scale;
+    return { x: canvasX, y: canvasY };
+  }
+
   // Mask helpers & placement
-  function maskAlphaAt(nx,ny){ if(!maskData) return 0; const x=Math.max(0,Math.min(maskW-1,Math.round(nx*maskW))); const y=Math.max(0,Math.min(maskH-1,Math.round(ny*maskH))); return maskData[(y*maskW+x)*4+3]; }
-  function insideMaskPadded(nx,ny,padPx){ const steps=2; let minA=255; for(let dy=-steps;dy<=steps;dy++){ for(let dx=-steps;dx<=steps;dx++){ const sx=nx+dx*(padPx/maskW); const sy=ny+dy*(padPx/maskH); if(sx<0||sx>1||sy<0||sy>1) return false; const a=maskAlphaAt(sx,sy); if(a<minA) minA=a; } } return minA>180; }
+  function maskAlphaAt(nx,ny){ 
+    if(!maskData) return 0; 
+    const x=Math.max(0,Math.min(maskW-1,Math.round(nx*maskW))); 
+    const y=Math.max(0,Math.min(maskH-1,Math.round(ny*maskH))); 
+    return maskData[(y*maskW+x)*4+3]; 
+  }
+  
+  function insideMaskPadded(nx,ny,padPx){ 
+    const steps=4; 
+    let minA=255; 
+    // Adjust padding for the CSS scale
+    const scale = getJarScale();
+    const adjustedPadPx = padPx / scale;
+    
+    for(let dy=-steps;dy<=steps;dy++){ 
+      for(let dx=-steps;dx<=steps;dx++){ 
+        const sx=nx+dx*(adjustedPadPx/maskW); 
+        const sy=ny+dy*(adjustedPadPx/maskH); 
+        if(sx<0||sx>1||sy<0||sy>1) return false; 
+        const a=maskAlphaAt(sx,sy); 
+        if(a<minA) minA=a; 
+      } 
+    } 
+    return minA>220; 
+  }
+  
   function mulberry32(a){ return function(){ var t= a += 0x6D2B79F5; t = Math.imul(t ^ (t>>>15), t|1); t ^= t + Math.imul(t ^ (t>>>7), t|61); return ((t ^ (t>>>14))>>>0)/4294967296; } }
   function hashString(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=(h<<13)|(h>>>19); } return (h>>>0); }
-  function sampleInside(seed, existing){ const rng=mulberry32(hashString(seed)); const pad=20; const minSep=0.65*coinSize; for(let i=0;i<120;i++){ const nx=0.06+rng()*0.88; const ny=0.60+Math.pow(rng(),2)*0.38; if(!insideMaskPadded(nx,ny,pad)) continue; let ok=true; for(const p of existing){ const dx=(nx-p.x)*canvas.clientWidth; const dy=(ny-p.y)*canvas.clientHeight; if(Math.hypot(dx,dy)<minSep){ ok=false; break; } } if(ok) return {x:nx,y:ny}; } return {x:0.5,y:0.92}; }
-  function ensureInside(e, existing){ if(!e.pos || !insideMaskPadded(e.pos.x,e.pos.y,20)){ e.pos=sampleInside(e.id,existing); save(entries); } }
+  
+  function sampleInside(seed, existing){ 
+    const rng=mulberry32(hashString(seed)); 
+    const pad=50; // Increased padding for better boundaries
+    const scale = getJarScale();
+    const effectiveSize = getEffectiveCanvasSize();
+    const minSep=0.55*coinSize / scale; // Smaller coins need less separation
+    
+    for(let i=0;i<200;i++){ // Increased attempts
+      // Create a more jar-like sampling shape
+      const baseY = rng();
+      const normalizedY = Math.pow(baseY, 1.6); // Bias towards bottom
+      
+      // Map to jar coordinates with tighter bounds
+      const yTop = 0.28;    // Start below jar neck
+      const yBottom = 0.12;  // Leave margin at bottom
+      const ny = yTop + normalizedY * (1 - yTop - yBottom);
+      
+      // Calculate jar width at this height (jar gets wider towards bottom)
+      const jarWidthFactor = 0.6 + 0.3 * normalizedY; // Narrower at top, wider at bottom
+      const centerX = 0.5;
+      const maxHalfWidth = jarWidthFactor * 0.32; // Maximum half-width of jar at this height
+      
+      // Sample x position within the jar width at this height
+      const xRange = rng() * 2 - 1; // -1 to 1
+      const nx = centerX + xRange * maxHalfWidth;
+      
+      // Ensure we're within jar bounds (0-1 range)
+      if(nx < 0.05 || nx > 0.95) continue;
+      
+      if(!insideMaskPadded(nx,ny,pad)) continue; 
+      
+      let ok=true; 
+      for(const p of existing){ 
+        const dx=(nx-p.x)*effectiveSize.width*scale; 
+        const dy=(ny-p.y)*effectiveSize.height*scale; 
+        if(Math.hypot(dx,dy)<minSep*scale){ ok=false; break; } 
+      } 
+      if(ok) return {x:nx,y:ny}; 
+    } 
+    
+    console.warn('Could not find valid position, using fallback'); 
+    return {x:0.5,y:0.75}; // Safer fallback position
+  }
+  
+  function ensureInside(e, existing){ 
+    if(!e.pos || !insideMaskPadded(e.pos.x,e.pos.y,50)){ 
+      e.pos=sampleInside(e.id,existing); 
+      save(entries); 
+    } 
+  }
 
   // Animation
   function easeOutBounce(t){ const n1=7.5625,d1=2.75; if(t<1/d1) return n1*t*t; else if(t<2/d1) return n1*(t-=1.5/d1)*t+.75; else if(t<2.5/d1) return n1*(t-=2.25/d1)*t+.9375; return n1*(t-=2.625/d1)*t+.984375; }
@@ -342,7 +434,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const ordered=[...entries].filter(e=>!inFlight.has(e.id))  // exclude in-flight
                               .sort((a,b)=>(a.pos?.y||0)-(b.pos?.y||0));
     const w=canvas.clientWidth,h=canvas.clientHeight;
-    ordered.forEach(e=>{ const x=Math.round(e.pos.x*(w-coinSize)); const y=Math.round(e.pos.y*(h-coinSize)); drawCoinSprite(x,y); });
+    const scale = getJarScale();
+    
+    ordered.forEach(e=>{ 
+      // Convert normalized position to canvas coordinates accounting for CSS scale
+      const canvasPos = normalizedToCanvas(e.pos.x, e.pos.y);
+      const x=Math.round(canvasPos.x - coinSize/2); 
+      const y=Math.round(canvasPos.y - coinSize/2); 
+      drawCoinSprite(x,y); 
+    });
   }
 
   function renderCoinsAnimated(){
@@ -353,8 +453,11 @@ document.addEventListener("DOMContentLoaded", () => {
     animCoins.forEach(c=>{
       const p=Math.min(1,(now-c.t0)/c.dur);
       const eased=easeOutBounce(p);
-      c.cur.x=lerp(0.62,c.pos.x,eased);
-      c.cur.y=lerp(0.07,c.pos.y,eased);
+      // Animation starts from normalized coordinates that work with our CSS scale
+      const startX = 0.62; // Right side of jar opening
+      const startY = 0.07; // Top of jar
+      c.cur.x=lerp(startX,c.pos.x,eased);
+      c.cur.y=lerp(startY,c.pos.y,eased);
       if(p>=1 && !c.sparkleUntil) c.sparkleUntil=now;
       const done = c.sparkleUntil && (now - c.sparkleUntil) >= 300;
       if(!done){ next.push(c); }
@@ -370,8 +473,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     drawList.sort((a,b)=>a.y-b.y);
     drawList.forEach(d=>{
-      const x=Math.round(d.x*(w-coinSize));
-      const y=Math.round(d.y*(h-coinSize));
+      // Convert normalized position to canvas coordinates accounting for CSS scale
+      const canvasPos = normalizedToCanvas(d.x, d.y);
+      const x=Math.round(canvasPos.x - coinSize/2); 
+      const y=Math.round(canvasPos.y - coinSize/2);
       drawCoinSprite(x,y);
       if(d.isAnim && d.sparkleTime) drawSparkle(x+coinSize*0.78,y+coinSize*0.32,d.sparkleTime);
     });
@@ -379,7 +484,28 @@ document.addEventListener("DOMContentLoaded", () => {
     return animCoins.length>0;
   }
 
-  function applyMask(){ if(!maskCanvas) return; ctx.save(); ctx.globalCompositeOperation="destination-in"; ctx.drawImage(maskCanvas,0,0,maskCanvas.width,maskCanvas.height,0,0,canvas.clientWidth,canvas.clientHeight); ctx.restore(); }
+  function applyMask(){ 
+    if(!maskCanvas) return; 
+    ctx.save(); 
+    ctx.globalCompositeOperation="destination-in"; 
+    
+    // Apply mask accounting for CSS scale
+    const scale = getJarScale();
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    
+    // Center the mask properly with the scaled jar
+    const maskScale = Math.min(w / maskCanvas.width, h / maskCanvas.height);
+    const scaledMaskW = maskCanvas.width * maskScale;
+    const scaledMaskH = maskCanvas.height * maskScale;
+    const offsetX = (w - scaledMaskW) / 2;
+    const offsetY = (h - scaledMaskH) / 2;
+    
+    ctx.drawImage(maskCanvas, 
+      offsetX, offsetY, scaledMaskW, scaledMaskH);
+    
+    ctx.restore(); 
+  }
 
   function renderFrame(){
     fitCanvas(); clearCanvas();
