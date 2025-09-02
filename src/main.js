@@ -41,6 +41,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Track coins that are currently animating so we don't draw their static version.
   const inFlight = new Set();
+  
+  // Phase 3: Offscreen static layer to avoid re-drawing all coins per frame
+  let staticLayer = null;
+  let staticLayerCtx = null;
+  let staticDirty = true;
+  function markStaticDirty(){ staticDirty = true; }
 
   // Mask prep
   const maskImg = new Image(); maskImg.src = "data:image/png;base64,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SwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgQQyBJAIEsAgSwBBLIEEMgSQCBLAIEsAQSyBBDIEkAgSwCBLAEEsgRwjI9XPwDYHAGE6/loM4QATrB79QOIksHNE8Ctswlfxsed7RNAIEsA53AWfBqjnkIAR3AzBrcQwM1zGnmRnclvnwAOYkM+iUGPIYAzuAeGGwjg9jmPvIQ74AkEcBJb8imMeQ4BHMI98JM5AI4ggAN8HHmLhzHkQQRwij9HQJvzSZy4ZxDACWTviT6+/cK2CeAYjoBP8WfAXgEcQgBHsB3hFgI4w8fiCPgUDoCzCOAgCvhwhjuMAA7xcfRNHsIBcAwBnMTXZjyYG+BpBHCKj2VxE/xgn/178aNgRQI4hpvgR/s4+JXtE8A5/n0m2BZ9hM+hugGeRACHUcBH0b+JBHCQvZcBFXBtX/177aNgZQI4iQI+zN/+mesoAjiKAj6I/g0lgLMo4EN8/HiDGVzQaXbL4gWrlTn/jeUEOI0z4Or0by4BHEcBV6Z/g7mmA+3fBbsNvpf+TeaiTqSAq/k3RVtlIrfAE+3fBdu499C/4VzWmb6dAR0Cb6V/07muQyng/f6NzzaZypUdywuBd3L8C3Bp53IIvIv+Fbi2gyng7dz+Nri6o0ngbfZGZoeM5vLO9r2AEngZ/ctwfYc7+DFJCnje3scL22M6V3g8h8Cr7E/K7hjPJZ7v8GdlSuAv3P22uMgFB4dACTzF8a/GVW6QwAvIX4/rHHF4HyyBh+SvyJXOcAj8zbfB2BUZLnWIBJ4if1UudooEHiN/XS53y4+XAvMN/D4L+yHGBa+RwH3yF+eS9/xMYLSBByOwF4Jc9KTD1wKLCZQ/BDDrZwJbDZQ/lkUAw8J3wodP2i7IcunDjiQw0MAfz9ceCHPx22oNVD++cf3rjiVwaAN/PknLv84KoNHAw5XuEx8sAsiyLCcSOCeCx56Ylc9iGfBlbAPVj9OsBP460cANR/Doc7Hm+ctiYN+pBm4wgsefhAXPPuuBAycbuKEInnj0VjsHLAl++izd0cXx9hU8lW5LnZ+sCo766tymInh8NTv6cZKVwUm/HQTfroIn42eNc5rFwa9+j+BbZPDUYxM/zrJAOOfXu+Hv7/JcZx6Qtc1ZFgkXuaCCT8zg2UdhXXMRC4XLXVLB/fdb20V/riXN5awWrnRpBfff9z4XLVI3vdzAkuEWf8t27QI6n8Tb/o8WMrewbrjdzRlc84+3hLmd1cO9XpBB6WMd1hDr2L+3fdSqevGJk3msJFa2fgmv+bQLXMOa4lGOfL7jsuV28ButUR7G4uJ5LvqqGEsSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbv/4sB+5+kVo0nAAAAAElFTkSuQmCC";
@@ -162,6 +168,41 @@ document.addEventListener("DOMContentLoaded", () => {
     return { x: canvasX, y: canvasY };
   }
 
+  // Phase 3: Spatial index helpers (normalized grid keyed by min separation)
+  function buildSpatialIndex(points, minSepPx){
+    const w = Math.max(1, canvas.clientWidth);
+    const h = Math.max(1, canvas.clientHeight);
+    const cellW = Math.max(1e-6, minSepPx / w);
+    const cellH = Math.max(1e-6, minSepPx / h);
+    const map = new Map();
+    const key = (i,j)=> i+","+j;
+    for(const p of points){
+      if(!p) continue;
+      const ci = Math.floor(p.x / cellW);
+      const cj = Math.floor(p.y / cellH);
+      const k = key(ci,cj);
+      let arr = map.get(k);
+      if(!arr){ arr=[]; map.set(k, arr); }
+      arr.push(p);
+    }
+    return { cellW, cellH, map };
+  }
+  function spatialNearby(index, nx, ny){
+    if(!index) return [];
+    const {cellW, cellH, map} = index;
+    const ci = Math.floor(nx / cellW);
+    const cj = Math.floor(ny / cellH);
+    const out = [];
+    for(let dj=-1; dj<=1; dj++){
+      for(let di=-1; di<=1; di++){
+        const k = (ci+di)+","+(cj+dj);
+        const arr = map.get(k);
+        if(arr) out.push(...arr);
+      }
+    }
+    return out;
+  }
+
   // Mask helpers & placement
   function maskAlphaAt(nx,ny){ 
     if(!maskData) return 0; 
@@ -197,6 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pad=70; // Further increased padding to respect visual jar outline
     const scale = getJarScale();
     const minSep=0.65*coinSize; // Maintain good visual separation between coins
+    const index = buildSpatialIndex(existing, minSep);
     
     for(let i=0;i<200;i++){ // Increased attempts
       // Create a more jar-like sampling shape
@@ -223,7 +265,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if(!insideMaskPadded(nx,ny,pad)) continue; 
       
       let ok=true; 
-      for(const p of existing){ 
+      const near = spatialNearby(index, nx, ny);
+      for(const p of near){ 
         const scale = getJarScale();
         const dx=(nx-p.x)*canvas.clientWidth / scale; 
         const dy=(ny-p.y)*canvas.clientHeight / scale; 
@@ -252,33 +295,42 @@ document.addEventListener("DOMContentLoaded", () => {
     const dur=650+Math.random()*200;
     animCoins.push({id:e.id,pos:e.pos,cur:{...start},t0:performance.now(),dur,sparkleUntil:0});
     inFlight.add(e.id);          // HIDE static coin while animating
+    markStaticDirty();           // Static layer must exclude this coin
     // Play sound at 65% of animation (during the drop, before landing)
     setTimeout(()=>playClink(), Math.round(dur * 0.65));
   }
   function drawSparkle(x,y,t){ const life=280; const p=(performance.now()-t)/life; if(p>1) return false; const a=1-p; const s=6+10*p; ctx.save(); ctx.globalAlpha=a*0.9; ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x-s,y); ctx.lineTo(x+s,y); ctx.moveTo(x,y-s); ctx.lineTo(x,y+s); ctx.stroke(); ctx.restore(); return true; }
 
-  function renderCoinsStatic(){
-    const ordered=[...entries].filter(e=>!inFlight.has(e.id))  // exclude in-flight
-                              .sort((a,b)=>(a.pos?.y||0)-(b.pos?.y||0));
-    const w=canvas.clientWidth,h=canvas.clientHeight;
+  // Rebuild the offscreen static layer with non-animating coins
+  function rebuildStaticLayer(){
+    const wCss = Math.max(1, canvas.clientWidth);
+    const hCss = Math.max(1, canvas.clientHeight);
     const scale = getJarScale();
-    
+    const w = Math.ceil(wCss * dpr);
+    const h = Math.ceil(hCss * dpr);
+    if(!staticLayer){ staticLayer = document.createElement('canvas'); }
+    staticLayer.width = w; staticLayer.height = h;
+    staticLayerCtx = staticLayer.getContext('2d');
+    staticLayerCtx.setTransform(dpr,0,0,dpr,0,0);
+    staticLayerCtx.clearRect(0,0,wCss,hCss);
+    const ordered=[...entries].filter(e=>!inFlight.has(e.id) && e.pos)
+                              .sort((a,b)=>a.pos.y-b.pos.y);
     ordered.forEach(e=>{ 
-      // Convert normalized position to canvas coordinates with boundary validation
       const canvasPos = normalizedToCanvas(e.pos.x, e.pos.y);
-      const scale = getJarScale();
-      const maxX = w / scale - coinSize;
-      const maxY = h / scale - coinSize;
+      const maxX = wCss / scale - coinSize;
+      const maxY = hCss / scale - coinSize;
       const x = Math.max(0, Math.min(maxX, Math.round(canvasPos.x - coinSize/2))); 
       const y = Math.max(0, Math.min(maxY, Math.round(canvasPos.y - coinSize/2))); 
-      drawCoinSprite(x,y); 
+      if(coinSprite){
+        if(coinShadowSprite) staticLayerCtx.drawImage(coinShadowSprite,x,y-coinShadowDY,coinSize,coinSize);
+        staticLayerCtx.drawImage(coinSprite,x,y,coinSize,coinSize);
+      }
     });
+    staticDirty = false;
   }
 
   function renderCoinsAnimated(){
     const now=performance.now();
-    const w=canvas.clientWidth,h=canvas.clientHeight;
-
     const next=[];
     animCoins.forEach(c=>{
       const p=Math.min(1,(now-c.t0)/c.dur);
@@ -291,29 +343,22 @@ document.addEventListener("DOMContentLoaded", () => {
       if(p>=1 && !c.sparkleUntil) c.sparkleUntil=now;
       const done = c.sparkleUntil && (now - c.sparkleUntil) >= 300;
       if(!done){ next.push(c); }
-      else{ inFlight.delete(c.id); }   // show static coin only AFTER landing + sparkle
+      else{ inFlight.delete(c.id); markStaticDirty(); }   // show static coin only AFTER landing + sparkle
     });
     animCoins = next;
-
-    const drawList=[];
-    // static coins (not in flight)
-    entries.forEach(e=>{ if(!inFlight.has(e.id)) drawList.push({x:e.pos.x,y:e.pos.y,isAnim:false}); });
-    // animated coins
-    animCoins.forEach(c=> drawList.push({x:c.cur.x,y:c.cur.y,isAnim:true,sparkleTime:c.sparkleUntil}));
-
-    drawList.sort((a,b)=>a.y-b.y);
-    drawList.forEach(d=>{
-      // Convert normalized position to canvas coordinates with boundary validation
-      const canvasPos = normalizedToCanvas(d.x, d.y);
+    // Draw animated coins only (static coins come from offscreen layer)
+    const w=canvas.clientWidth,h=canvas.clientHeight;
+    const animOrdered = [...animCoins].sort((a,b)=>a.cur.y-b.cur.y);
+    animOrdered.forEach(c=>{
+      const canvasPos = normalizedToCanvas(c.cur.x, c.cur.y);
       const scale = getJarScale();
       const maxX = w / scale - coinSize;
       const maxY = h / scale - coinSize;
       const x = Math.max(0, Math.min(maxX, Math.round(canvasPos.x - coinSize/2))); 
       const y = Math.max(0, Math.min(maxY, Math.round(canvasPos.y - coinSize/2)));
       drawCoinSprite(x,y);
-      if(d.isAnim && d.sparkleTime) drawSparkle(x+coinSize*0.78,y+coinSize*0.32,d.sparkleTime);
+      if(c.sparkleUntil) drawSparkle(x+coinSize*0.78,y+coinSize*0.32,c.sparkleUntil);
     });
-
     return animCoins.length>0;
   }
 
@@ -334,8 +379,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderFrame(){
     fitCanvas(); clearCanvas();
+    // Rebuild static layer if size changed or marked dirty
+    const wCss = canvas.clientWidth, hCss = canvas.clientHeight;
+    const needsRebuild = !staticLayer || staticLayer.width !== Math.ceil(wCss*dpr) || staticLayer.height !== Math.ceil(hCss*dpr) || staticDirty;
+    if(needsRebuild){ rebuildStaticLayer(); }
+    // Draw static layer first
+    if(staticLayer){ ctx.drawImage(staticLayer, 0, 0, wCss, hCss); }
+    // Draw animated coins on top
     const hasAnim = renderCoinsAnimated();
-    if(!hasAnim) renderCoinsStatic();
     applyMask();
     countEl.textContent = entries.length;
     if(hasAnim) requestAnimationFrame(renderFrame);
@@ -375,7 +426,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // also cancel animation if any
           animCoins = animCoins.filter(c=>c.id!==e.id);
           inFlight.delete(e.id);
-          save(entries); renderList(); renderFrame();
+          save(entries); markStaticDirty(); renderList(); renderFrame();
         }
       }
     });
@@ -395,7 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!entries.length){ alert("Jar is already empty."); return; }
     if(confirm("Reset the jar and clear all coins? This cannot be undone.")){
       entries=[]; animCoins=[]; inFlight.clear();
-      save(entries); renderList(); renderFrame();
+      save(entries); markStaticDirty(); renderList(); renderFrame();
     }
   }
   document.getElementById("exportBtn").addEventListener("click", exportCSV);
@@ -438,7 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let __rzTimer=null;
   window.addEventListener('resize', ()=>{
     if(__rzTimer) clearTimeout(__rzTimer);
-    __rzTimer = setTimeout(()=>{ buildSprites(); renderFrame(); }, 150);
+    __rzTimer = setTimeout(()=>{ buildSprites(); markStaticDirty(); renderFrame(); }, 150);
   });
   // Initialize once mask is ready; avoid duplicate interval-based init
   if(maskCanvas) initial();
