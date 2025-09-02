@@ -122,7 +122,8 @@
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   .dialog{width:min(640px,92vw);background:#fff;border:1px solid var(--border);
     border-radius:var(--radius-xl);box-shadow:var(--shadow-lg);padding:var(--space-6);
-    position:relative;animation:slideUp 0.3s ease;transform:none}
+    position:relative;animation:slideUp 0.3s ease;transform:none;
+    max-height:min(92vh, 720px);overflow:auto}
   @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
   .dialog h3{margin:var(--space-1) 0 var(--space-4);font-size:var(--text-xl);font-weight:700;color:var(--text)}
   .close{position:absolute;top:var(--space-4);right:var(--space-4);border:none;
@@ -141,6 +142,9 @@
     background:#fff9f5;border-color:var(--accent)}
   .coin-dot{width:16px;height:16px;border-radius:50%;border:1px solid rgba(30,41,59,.2);
     box-shadow:var(--shadow-sm)}
+  .coin-icon{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;
+    color:var(--muted)}
+  .coin-icon svg{width:20px;height:20px;stroke:currentColor}
   .coin-text{display:flex;flex-direction:column;gap:2px;min-width:0}
   .coin-title{font-weight:700;line-height:1.2}
   .coin-desc{color:var(--muted);font-size:var(--text-sm);line-height:1.3}
@@ -148,6 +152,7 @@
     border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);outline:none;
     font-family:inherit;font-size:var(--text-base);line-height:1.5;resize:vertical;
     min-height:100px;transition:border-color 0.2s ease}
+  #step2{margin-top:var(--space-4)}
   .dialog textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(234,122,95,.1)}
   .dialog .actions{display:flex;justify-content:flex-end;gap:var(--space-3);
     margin-top:var(--space-4)}

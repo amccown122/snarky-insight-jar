@@ -1,36 +1,39 @@
 document.addEventListener("DOMContentLoaded", () => {
   const CATEGORY_LIST = [
-    {
-      name: "Nonsense Request Coin",
-      color: "#a855f7",
-      desc: "For buzzword soups like “AI + machine learning + predictive + synergy” that aren’t actual questions."
-    },
-    {
-      name: "It’s Not the Data Coin",
-      color: "#f59e0b",
-      desc: "For when “the data is wrong” really means “it doesn’t match what I imagined.”"
-    },
-    {
-      name: "Magic Wand Coin",
-      color: "#8b5cf6",
-      desc: "For expectations that analytics = fortune telling, instant answers, or custom apps on demand."
-    },
-    {
-      name: "Chaos Coin",
-      color: "#ef4444",
-      desc: "For pipelines that crumble, dashboards that contradict, or fixes that “only work on the third Tuesday.”"
-    },
-    {
-      name: "Shrug-It-Off Coin",
-      color: "#64748b",
-      desc: "For when insights get ignored, requests solve nothing, or analysis changes absolutely nothing."
-    },
-    {
-      name: "Click Support Coin",
-      color: "#3b82f6",
-      desc: "For when analysts get treated like IT: “fix my Excel formula… and why doesn’t this system load?”"
-    }
+    { name: "Nonsense Request Coin", color: "#a855f7", icon: "question-mark-circle",
+      desc: "For buzzword soups like “AI + machine learning + predictive + synergy” that aren’t actual questions." },
+    { name: "It’s Not the Data Coin", color: "#f59e0b", icon: "exclamation-triangle",
+      desc: "For when “the data is wrong” really means “it doesn’t match what I imagined.”" },
+    { name: "Magic Wand Coin", color: "#8b5cf6", icon: "sparkles",
+      desc: "For expectations that analytics = fortune telling, instant answers, or custom apps on demand." },
+    { name: "Chaos Coin", color: "#ef4444", icon: "bolt",
+      desc: "For pipelines that crumble, dashboards that contradict, or fixes that “only work on the third Tuesday.”" },
+    { name: "Shrug-It-Off Coin", color: "#64748b", icon: "face-frown",
+      desc: "For when insights get ignored, requests solve nothing, or analysis changes absolutely nothing." },
+    { name: "Click Support Coin", color: "#3b82f6", icon: "wrench-screwdriver",
+      desc: "For when analysts get treated like IT: “fix my Excel formula… and why doesn’t this system load?”" }
   ];
+
+  // Inline icons (Heroicons-inspired, 24/outline). Colored via currentColor.
+  function renderIcon(name, color){
+    const wrap = (p)=>`<span class="coin-icon" aria-hidden="true" style="color:${color}"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg></span>`;
+    switch(name){
+      case 'question-mark-circle':
+        return wrap('<path d="M8.228 9a3.5 3.5 0 1 1 6.494 1.48c-.54.965-1.496 1.49-2.222 1.947-.67.424-1.25.79-1.25 1.573V14"/><path d="M12 17h.01"/><path d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12 6.615 2.25 12 2.25z"/>' );
+      case 'exclamation-triangle':
+        return wrap('<path d="M10.29 3.86a1.5 1.5 0 0 1 2.42 0l8.28 12.42A1.5 1.5 0 0 1 19.78 18H4.22a1.5 1.5 0 0 1-1.21-2.72L10.29 3.86z"/><path d="M12 9v4"/><path d="M12 17h.01"/>' );
+      case 'sparkles':
+        return wrap('<path d="M12 3v3m0 12v3m9-9h-3M6 12H3m12.364-6.364L14.95 7.05M9.05 16.95l-1.414 1.414m0-11.314L9.05 7.05m5.9 9.9 1.414 1.414"/>' );
+      case 'bolt':
+        return wrap('<path d="M13 3L4 14h6l-1 7 9-11h-6l1-7z"/>' );
+      case 'face-frown':
+        return wrap('<path d="M15.182 15.182a4 4 0 0 0-6.364 0"/><path d="M9.75 9.75h.01M14.25 9.75h.01"/><path d="M12 2.25c5.385 0 9.75 4.365 9.75 9.75S17.385 21.75 12 21.75 2.25 17.385 2.25 12 6.615 2.25 12 2.25z"/>' );
+      case 'wrench-screwdriver':
+        return wrap('<path d="M14.7 6.3a4 4 0 0 0-5.657 5.657l8.485 8.485a2 2 0 0 0 2.829-2.829L14.7 6.3z"/><path d="M8.5 5.5l.75 2.25L11.5 8.5l-2.25.75L8.5 11.5l-.75-2.25L5.5 8.5l2.25-.75L8.5 5.5z"/>' );
+      default:
+        return wrap('<circle cx="12" cy="12" r="9"/>' );
+    }
+  }
   const STORAGE_KEY = "snarky-jar-entries-v1";
   const $ = (s,d=document)=>d.querySelector(s);
   const canvas = $("#jarCanvas"); const ctx = canvas.getContext("2d");
@@ -509,15 +512,23 @@ document.addEventListener("DOMContentLoaded", () => {
       div.className="coin-opt";
       div.setAttribute("role","option");
       div.setAttribute("tabindex","0");
-      // Dot + text stack with title and short description
+      // Icon + text stack with title and short description
+      const iconSvg = renderIcon(c.icon, c.color);
       div.innerHTML = `
-        <span class="coin-dot" style="background:${c.color}"></span>
+        ${iconSvg}
         <div class="coin-text">
           <div class="coin-title">${c.name}</div>
           <div class="coin-desc">${c.desc || ""}</div>
         </div>
       `;
-      const selectIt=()=>{ document.querySelectorAll('.coin-opt').forEach(x=>x.classList.remove("selected")); div.classList.add("selected"); selectedCat=c.name; step2.style.display="block"; modalText.focus(); };
+      const selectIt=()=>{
+        document.querySelectorAll('.coin-opt').forEach(x=>x.classList.remove("selected"));
+        div.classList.add("selected");
+        selectedCat=c.name; step2.style.display="block"; modalText.focus();
+        // Make sure the textarea and Add button are visible
+        const target = document.getElementById('modalText');
+        if(target){ target.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+      };
       div.addEventListener("click",selectIt); div.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); selectIt(); } });
       coinGrid.appendChild(div);
     });
