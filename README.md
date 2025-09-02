@@ -28,9 +28,28 @@ A small, single‑page app for logging “snarky insight” moments by dropping 
 
 ## Local Development
 
-- Open `Snarky-Insight-Jar-trimmed-padded.html` directly in a browser.
+- Open `index.html` directly in a browser.
 - Data persists via `localStorage` under key `snarky-jar-entries-v1`.
 - Export entries as CSV via the UI.
+
+### Linting and Formatting
+
+- Ensure Node.js 20+ is installed.
+- Install dev deps: `npm ci`
+- Lint: `npm run lint`
+- Format: `npm run format`
+- Check formatting (CI): `npm run format:check`
+
+GitHub Actions runs lint + Prettier check on pushes and PRs to `main/master`.
+
+### Repo Layout (transitioning)
+
+- `index.html` — current entry point (temporarily includes inline CSS/JS).
+- `Snarky-Insight-Jar-trimmed-padded.html` — original monolith (kept as fallback).
+- `src/style.css` — placeholder for extracted CSS.
+- `src/main.js` — placeholder for extracted JS.
+
+Next step is to extract `<style>` → `src/style.css` and `<script>` → `src/main.js` without changing behavior.
 
 ## Assets
 
