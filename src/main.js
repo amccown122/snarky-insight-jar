@@ -1,11 +1,35 @@
 document.addEventListener("DOMContentLoaded", () => {
   const CATEGORY_LIST = [
-    { name: "Nonsense Request Coin", color: "#a855f7" },
-    { name: "It’s Not the Data Coin", color: "#f59e0b" },
-    { name: "Magic Wand Coin", color: "#8b5cf6" },
-    { name: "Chaos Coin", color: "#ef4444" },
-    { name: "Shrug it off Coin", color: "#64748b" },
-    { name: "Click Support Coin", color: "#3b82f6" }
+    {
+      name: "Nonsense Request Coin",
+      color: "#a855f7",
+      desc: "For buzzword soups like “AI + machine learning + predictive + synergy” that aren’t actual questions."
+    },
+    {
+      name: "It’s Not the Data Coin",
+      color: "#f59e0b",
+      desc: "For when “the data is wrong” really means “it doesn’t match what I imagined.”"
+    },
+    {
+      name: "Magic Wand Coin",
+      color: "#8b5cf6",
+      desc: "For expectations that analytics = fortune telling, instant answers, or custom apps on demand."
+    },
+    {
+      name: "Chaos Coin",
+      color: "#ef4444",
+      desc: "For pipelines that crumble, dashboards that contradict, or fixes that “only work on the third Tuesday.”"
+    },
+    {
+      name: "Shrug-It-Off Coin",
+      color: "#64748b",
+      desc: "For when insights get ignored, requests solve nothing, or analysis changes absolutely nothing."
+    },
+    {
+      name: "Click Support Coin",
+      color: "#3b82f6",
+      desc: "For when analysts get treated like IT: “fix my Excel formula… and why doesn’t this system load?”"
+    }
   ];
   const STORAGE_KEY = "snarky-jar-entries-v1";
   const $ = (s,d=document)=>d.querySelector(s);
@@ -481,8 +505,18 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedCat=null; step2.style.display="none"; modalText.value=""; addBtn.disabled=true; charCount.textContent="0/140";
     coinGrid.innerHTML="";
     CATEGORY_LIST.forEach((c)=>{
-      const div=document.createElement("div"); div.className="coin-opt"; div.setAttribute("role","option"); div.setAttribute("tabindex","0");
-      div.innerHTML=`<span class="coin-dot" style="background:${c.color}"></span>${c.name}`;
+      const div=document.createElement("div");
+      div.className="coin-opt";
+      div.setAttribute("role","option");
+      div.setAttribute("tabindex","0");
+      // Dot + text stack with title and short description
+      div.innerHTML = `
+        <span class="coin-dot" style="background:${c.color}"></span>
+        <div class="coin-text">
+          <div class="coin-title">${c.name}</div>
+          <div class="coin-desc">${c.desc || ""}</div>
+        </div>
+      `;
       const selectIt=()=>{ document.querySelectorAll('.coin-opt').forEach(x=>x.classList.remove("selected")); div.classList.add("selected"); selectedCat=c.name; step2.style.display="block"; modalText.focus(); };
       div.addEventListener("click",selectIt); div.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); selectIt(); } });
       coinGrid.appendChild(div);
