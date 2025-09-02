@@ -51,6 +51,20 @@ GitHub Actions runs lint + Prettier check on pushes and PRs to `main/master`.
 
 Next step is to extract `<style>` → `src/style.css` and `<script>` → `src/main.js` without changing behavior.
 
+## Contributing (Tests)
+
+- Install dev deps: `npm ci`
+- Run tests (CI mode): `npm test`
+- Optional watch mode: `npx vitest` (interactive UI)
+- Test location: place unit tests under `tests/` with `*.test.js` filenames.
+- What to test now:
+  - Pure helpers in `src/lib.js` (e.g., `escapeHtml`, `linkify`, `timeAgo`).
+  - Algorithmic helpers like spatial indexing (`buildSpatialIndex`, `spatialNearby`).
+- Style guidelines:
+  - Keep tests small and deterministic; use `vitest` fake timers for time-based code.
+  - Prefer testing pure functions over DOM where possible.
+  - Run `npm run lint` and `npm run format` before pushing.
+
 ## Assets
 
 - `assets/jar-inside.png` — jar artwork (external preferred)

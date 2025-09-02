@@ -12,8 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const canvas = $("#jarCanvas"); const ctx = canvas.getContext("2d");
   const listEl=$("#list"), countEl=$("#count");
 
-  // Swap embedded data URIs for external cached assets (non-destructive, guarded)
-  // We keep embedded as fallback because prior changes here were brittle.
+  // Prefer the newly provided cropped external assets (guarded)
   try {
     const safeSwap = (selector, url) => {
       const el = document.querySelector(selector);
@@ -31,8 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
       probe.onerror = () => { /* keep embedded fallback */ };
       probe.src = url;
     };
-    safeSwap('.jar-inside', 'assets/jar-inside.png');
-    safeSwap('.tape-art', 'assets/tape-art.png');
+    safeSwap('.jar-inside', 'assets/jar-inside2.png');
+    safeSwap('.tape-art', 'assets/tape-art2.png');
   } catch {}
 
   function load(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); } catch(e){ return []; } }
@@ -63,24 +62,23 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   // Keep embedded mask as primary source to avoid race conditions with init.
   // Try to upgrade to external mask if it matches dimensions (safe, cached)
+  // Try the newly provided cropped mask; if it loads, replace the embedded one.
   try {
-    const extMask = new Image();
-    extMask.decoding = 'async';
-    extMask.onload = () => {
-      // Only replace if dimensions match to avoid misalignment bugs
-      if (maskW && maskH && extMask.naturalWidth === maskW && extMask.naturalHeight === maskH) {
-        const off2 = document.createElement('canvas'); off2.width = maskW; off2.height = maskH;
-        const ctx2 = off2.getContext('2d'); ctx2.drawImage(extMask, 0, 0);
-        const d = ctx2.getImageData(0,0,maskW,maskH); const px = d.data;
-        for (let i=0;i<px.length;i+=4){ const lum=(px[i]*0.299+px[i+1]*0.587+px[i+2]*0.114); px[i]=255; px[i+1]=255; px[i+2]=255; px[i+3]=lum; }
-        ctx2.putImageData(d,0,0);
-        maskCanvas = off2; maskData = ctx2.getImageData(0,0,maskW,maskH).data;
-        // Refresh rendering with the upgraded mask
-        requestAnimationFrame(renderFrame);
-      }
+    const newMask = new Image();
+    newMask.decoding = 'async';
+    newMask.onload = () => {
+      const w = newMask.naturalWidth, h = newMask.naturalHeight;
+      if(!w || !h) return;
+      const off2 = document.createElement('canvas'); off2.width = w; off2.height = h;
+      const ctx2 = off2.getContext('2d'); ctx2.drawImage(newMask, 0, 0);
+      const d = ctx2.getImageData(0,0,w,h); const px = d.data;
+      for (let i=0;i<px.length;i+=4){ const lum=(px[i]*0.299+px[i+1]*0.587+px[i+2]*0.114); px[i]=255; px[i+1]=255; px[i+2]=255; px[i+3]=lum; }
+      ctx2.putImageData(d,0,0);
+      maskCanvas = off2; maskData = ctx2.getImageData(0,0,w,h).data; maskW=w; maskH=h;
+      requestAnimationFrame(renderFrame);
     };
-    extMask.onerror = () => { /* keep embedded mask */ };
-    extMask.src = 'assets/jar-mask.png';
+    newMask.onerror = () => {};
+    newMask.src = 'assets/jar-mask2.png';
   } catch {}
 
   // Audio clink - using real MP3 file
@@ -233,11 +231,26 @@ document.addEventListener("DOMContentLoaded", () => {
   function mulberry32(a){ return function(){ var t= a += 0x6D2B79F5; t = Math.imul(t ^ (t>>>15), t|1); t ^= t + Math.imul(t ^ (t>>>7), t|61); return ((t ^ (t>>>14))>>>0)/4294967296; } }
   function hashString(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=(h<<13)|(h>>>19); } return (h>>>0); }
   
+  // Geometric fallback approximating the jar silhouette in normalized space.
+  function insideVisualJar(nx, ny){
+    const yTop = 0.32;     // below neck
+    const yBottom = 0.18;  // above base curve
+    if (ny < yTop || ny > 1 - yBottom) return false;
+    const normalizedY = (ny - yTop) / (1 - yTop - yBottom);
+    if (normalizedY < 0 || normalizedY > 1) return false;
+    const centerX = 0.5;
+    const jarWidthFactor = 0.5 + 0.35 * normalizedY; // narrow at top, wider at bottom
+    const maxHalfWidth = jarWidthFactor * 0.34;       // safely within outline
+    const left = centerX - maxHalfWidth;
+    const right = centerX + maxHalfWidth;
+    return nx >= Math.max(0.12, left) && nx <= Math.min(0.88, right);
+  }
+
   function sampleInside(seed, existing){ 
     const rng=mulberry32(hashString(seed)); 
-    const pad=70; // Further increased padding to respect visual jar outline
+    const pad=48; // Reduce padding; previous mask guard was too tight
     const scale = getJarScale();
-    const minSep=0.65*coinSize; // Maintain good visual separation between coins
+    const minSep=0.55*coinSize; // Slightly smaller separation to increase capacity
     const index = buildSpatialIndex(existing, minSep);
     
     for(let i=0;i<200;i++){ // Increased attempts
@@ -253,7 +266,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Calculate jar width at this height to match cartoon jar outline
       const jarWidthFactor = 0.5 + 0.35 * normalizedY; // More conservative width at top, gradual widening
       const centerX = 0.5;
-      const maxHalfWidth = jarWidthFactor * 0.28; // Reduced maximum width to stay within visual jar boundaries
+      const maxHalfWidth = jarWidthFactor * 0.32; // Allow a bit more lateral spread in body
       
       // Sample x position within the jar width at this height
       const xRange = rng() * 2 - 1; // -1 to 1
@@ -262,7 +275,10 @@ document.addEventListener("DOMContentLoaded", () => {
       // Ensure we're within visual jar bounds with more conservative margins
       if(nx < 0.15 || nx > 0.85) continue;
       
-      if(!insideMaskPadded(nx,ny,pad)) continue; 
+      if(!insideMaskPadded(nx,ny,pad)){
+        // Fallback to an analytic jar shape so coins still disperse
+        if(!insideVisualJar(nx, ny)) continue;
+      }
       
       let ok=true; 
       const near = spatialNearby(index, nx, ny);
