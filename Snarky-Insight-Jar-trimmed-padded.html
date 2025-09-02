@@ -239,14 +239,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const canvas = $("#jarCanvas"); const ctx = canvas.getContext("2d");
   const listEl=$("#list"), countEl=$("#count");
 
-  // Swap embedded data URIs for external cached assets (non-destructive)
-  // This keeps behavior identical while enabling caching and smaller repaints.
-  // Once validated, we can remove the embedded data URIs from the HTML entirely.
+  // Swap embedded data URIs for external cached assets (non-destructive, guarded)
+  // We keep embedded as fallback because prior changes here were brittle.
   try {
-    const jarImg = document.querySelector('.jar-inside');
-    if (jarImg) { jarImg.decoding = 'async'; jarImg.src = 'assets/jar-inside.png'; }
-    const tapeImg = document.querySelector('.tape-art');
-    if (tapeImg) { tapeImg.decoding = 'async'; tapeImg.src = 'assets/tape-art.png'; }
+    const safeSwap = (selector, url) => {
+      const el = document.querySelector(selector);
+      if (!el) return;
+      const probe = new Image();
+      probe.decoding = 'async';
+      probe.onload = () => {
+        // Only swap if external asset loaded successfully (dims available)
+        if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+          el.decoding = 'async';
+          // Preserve existing size/position; just change the source
+          el.src = url;
+        }
+      };
+      probe.onerror = () => { /* keep embedded fallback */ };
+      probe.src = url;
+    };
+    safeSwap('.jar-inside', 'assets/jar-inside.png');
+    safeSwap('.tape-art', 'assets/tape-art.png');
   } catch {}
 
   function load(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); } catch(e){ return []; } }
@@ -270,6 +283,26 @@ document.addEventListener("DOMContentLoaded", () => {
     buildSprites(); initial();
   };
   // Keep embedded mask as primary source to avoid race conditions with init.
+  // Try to upgrade to external mask if it matches dimensions (safe, cached)
+  try {
+    const extMask = new Image();
+    extMask.decoding = 'async';
+    extMask.onload = () => {
+      // Only replace if dimensions match to avoid misalignment bugs
+      if (maskW && maskH && extMask.naturalWidth === maskW && extMask.naturalHeight === maskH) {
+        const off2 = document.createElement('canvas'); off2.width = maskW; off2.height = maskH;
+        const ctx2 = off2.getContext('2d'); ctx2.drawImage(extMask, 0, 0);
+        const d = ctx2.getImageData(0,0,maskW,maskH); const px = d.data;
+        for (let i=0;i<px.length;i+=4){ const lum=(px[i]*0.299+px[i+1]*0.587+px[i+2]*0.114); px[i]=255; px[i+1]=255; px[i+2]=255; px[i+3]=lum; }
+        ctx2.putImageData(d,0,0);
+        maskCanvas = off2; maskData = ctx2.getImageData(0,0,maskW,maskH).data;
+        // Refresh rendering with the upgraded mask
+        requestAnimationFrame(renderFrame);
+      }
+    };
+    extMask.onerror = () => { /* keep embedded mask */ };
+    extMask.src = 'assets/jar-mask.png';
+  } catch {}
 
   // Audio clink - using real MP3 file
   let coinAudio = null;
@@ -305,6 +338,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let coinSize = 42;
   const JAR_SCALE = 1.0; // CSS handles scaling, coordinates should be 1:1
   let coinSprite = null;
+  let coinShadowSprite = null, coinShadowDY = 0;
   function buildSprites(){
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio||1));
     const s = Math.round(coinSize*2);
@@ -321,6 +355,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const hi=c.createRadialGradient(r*0.6,r*0.55,1,r*0.6,r*0.55,r*0.9); hi.addColorStop(0,"rgba(255,255,255,.65)"); hi.addColorStop(1,"rgba(255,255,255,0)");
     c.fillStyle=hi; c.beginPath(); c.arc(r,r,r*0.88,0,Math.PI*2); c.fill();
     coinSprite=off;
+
+    // Shadow sprite (pre-baked to avoid per-frame blur)
+    coinShadowDY = Math.round(s*0.10);
+    const sh=document.createElement("canvas"); sh.width=s; sh.height=s;
+    const sc=sh.getContext("2d");
+    sc.save();
+    sc.globalAlpha=0.45;
+    sc.filter="blur(5px)";
+    sc.fillStyle="rgba(0,0,0,0.35)";
+    sc.beginPath();
+    sc.ellipse(s*0.5,(s*0.5+s*0.30)-coinShadowDY,s*0.42,s*0.22,0,0,Math.PI*2);
+    sc.fill();
+    sc.restore();
+    coinShadowSprite=sh;
   }
   // Build sprites once early so coins can render even if mask is still loading.
   try { buildSprites(); } catch {}
@@ -328,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Canvas utils
   function fitCanvas(){ const rect=canvas.getBoundingClientRect(); dpr=Math.max(1,Math.min(3,window.devicePixelRatio||1)); const w=Math.max(1,Math.ceil(rect.width*dpr)); const h=Math.max(1,Math.ceil(rect.height*dpr)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} ctx.setTransform(dpr,0,0,dpr,0,0); }
   function clearCanvas(){ ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight); }
-  function drawCoinSprite(x,y){ if(!coinSprite) return; const s=coinSize; ctx.save(); ctx.globalAlpha=0.45; ctx.filter="blur(5px)"; ctx.fillStyle="rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(x+s*0.5,y+s*0.5+s*0.30,s*0.42,s*0.22,0,0,Math.PI*2); ctx.fill(); ctx.restore(); ctx.drawImage(coinSprite,x,y,s,s); }
+  function drawCoinSprite(x,y){ if(!coinSprite) return; const s=coinSize; if(coinShadowSprite) ctx.drawImage(coinShadowSprite,x,y-coinShadowDY,s,s); ctx.drawImage(coinSprite,x,y,s,s); }
 
   // Coordinate system helpers
   function getJarScale(){ return 1; } // CSS --jar-scale value
@@ -614,7 +662,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // initial
   function ensureAll(){ const existing=[]; entries.forEach(e=>{ ensureInside(e, existing); existing.push(e.pos); }); save(entries); }
   function initial(){ ensureAll(); renderList(); renderFrame(); }
-  window.addEventListener('resize', ()=>{ buildSprites(); renderFrame(); });
+  let __rzTimer=null;
+  window.addEventListener('resize', ()=>{
+    if(__rzTimer) clearTimeout(__rzTimer);
+    __rzTimer = setTimeout(()=>{ buildSprites(); renderFrame(); }, 150);
+  });
   // Initialize once mask is ready; avoid duplicate interval-based init
   if(maskCanvas) initial();
 });
