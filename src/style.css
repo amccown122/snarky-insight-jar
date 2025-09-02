@@ -23,7 +23,7 @@
     --radius-xl: 1.5rem; --radius-full: 9999px;
     
     --tape-scale:1.05; --tape-x:0%; --tape-y:-1%;
-    --card-max: 1080px; --card-ar: 4/3; --jar-scale: 1;
+    --card-max: 1080px; --card-ar: 8/5; --jar-scale: 1;
   }
   *, *::before, *::after{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -56,7 +56,7 @@
   .brand .word{font-size:clamp(1rem,1.6vw,1.5rem);line-height:1;opacity:.95;text-transform:uppercase;
     font-weight:900;letter-spacing:0.05em}
   .container{max-width:1400px;margin:var(--space-2) auto var(--space-16);padding:0 var(--space-6)}
-  .hero{display:grid;grid-template-columns:1fr 1.35fr;gap:var(--space-8);align-items:center;
+  .hero{display:grid;grid-template-columns:1fr 1.45fr;gap:var(--space-8);align-items:center;
     margin-bottom:var(--space-8)}
   h1{font-size:clamp(2rem,3.8vw,3.5rem);margin:0 0 var(--space-3);line-height:1.05;
     font-weight:900;letter-spacing:-0.025em}
@@ -82,7 +82,7 @@
   .tool:active{transform:translateY(0);transition:transform 0.1s ease}
   .tool.warn{background:#fef2f2;border-color:#fecaca;color:#dc2626}
   .tool.warn:hover{background:#fee2e2;border-color:#f87171;color:#b91c1c}
-  .card{position:relative;width: 100%;aspect-ratio: var(--card-ar);border-radius: 26px;padding:12px;margin-inline:auto;display:flex;align-items:center;justify-content:center;background:
+  .card{position:relative;width: 100%;aspect-ratio: var(--card-ar);border-radius: 26px;padding:10px;margin-inline:auto;display:flex;align-items:center;justify-content:center;background:
       radial-gradient(140% 120% at 0% 100%, #f59e0b33 0%, transparent 40%),
       radial-gradient(120% 120% at 100% 0%, #8b5cf633 0%, transparent 50%),
       linear-gradient(135deg,#f6e4b8,#f7b4a8 55%, #bda1f1);border:1px solid var(--border);box-shadow:var(--shadow);}
