@@ -253,14 +253,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const minSep=0.55*coinSize; // Slightly smaller separation to increase capacity
     const index = buildSpatialIndex(existing, minSep);
     
-    for(let i=0;i<200;i++){ // Increased attempts
+    for(let i=0;i<260;i++){
       // Create a more jar-like sampling shape
       const baseY = rng();
-      const normalizedY = Math.pow(baseY, 1.6); // Bias towards bottom
+      const normalizedY = Math.pow(baseY, 2.8); // Stronger bias to bottom
       
       // Map to jar coordinates with tighter bounds for visual jar shape
-      const yTop = 0.32;    // Start further below jar neck to avoid appearing above jar outline
-      const yBottom = 0.18;  // Increased bottom margin to stay above jar base
+      const yTop = 0.58;    // Restrict to lower region to simulate pile
+      const yBottom = 0.10; // Margin above base curve
       const ny = yTop + normalizedY * (1 - yTop - yBottom);
       
       // Calculate jar width at this height to match cartoon jar outline
@@ -348,6 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderCoinsAnimated(){
     const now=performance.now();
     const next=[];
+    let landedThisFrame = false;
     animCoins.forEach(c=>{
       const p=Math.min(1,(now-c.t0)/c.dur);
       const eased=easeOutBounce(p);
@@ -359,7 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(p>=1 && !c.sparkleUntil) c.sparkleUntil=now;
       const done = c.sparkleUntil && (now - c.sparkleUntil) >= 300;
       if(!done){ next.push(c); }
-      else{ inFlight.delete(c.id); markStaticDirty(); }   // show static coin only AFTER landing + sparkle
+      else{ inFlight.delete(c.id); markStaticDirty(); landedThisFrame = true; }   // show static coin only AFTER landing + sparkle
     });
     animCoins = next;
     // Draw animated coins only (static coins come from offscreen layer)
@@ -375,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
       drawCoinSprite(x,y);
       if(c.sparkleUntil) drawSparkle(x+coinSize*0.78,y+coinSize*0.32,c.sparkleUntil);
     });
-    return animCoins.length>0;
+    return { hasAnim: animCoins.length>0, landed: landedThisFrame };
   }
 
   function applyMask(){ 
@@ -402,10 +403,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Draw static layer first
     if(staticLayer){ ctx.drawImage(staticLayer, 0, 0, wCss, hCss); }
     // Draw animated coins on top
-    const hasAnim = renderCoinsAnimated();
+    const animState = renderCoinsAnimated();
     applyMask();
     countEl.textContent = entries.length;
-    if(hasAnim) requestAnimationFrame(renderFrame);
+    // Schedule another frame if animation continues or we just landed a coin
+    if(animState.hasAnim || animState.landed) requestAnimationFrame(renderFrame);
   }
 
   // List + CSV + reset
